@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark Mode Table Palette -->
+    <color name="bg_dark">#121418</color>
+    <color name="surface_dark">#1E222B</color>
+    <color name="card_dark">#282E3B</color>
+    <color name="gold_primary">#E5A93B</color>
+    <color name="gold_light">#FFD166</color>
+    <color name="emerald_felt">#06D6A0</color>
+    <color name="crimson_heart">#EF476F</color>
+    <color name="blue_slate">#118AB2</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#A0AAB8</color>
+</resources>

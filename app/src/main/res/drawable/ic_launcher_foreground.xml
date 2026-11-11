@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Heart Symbol (representing Syrian King of Hearts) -->
+    <path
+        android:fillColor="#EF476F"
+        android:pathData="M54,42 C51,34 42,32 36,38 C28,46 36,58 54,74 C72,58 80,46 72,38 C66,32 57,34 54,42 Z" />
+</vector>
