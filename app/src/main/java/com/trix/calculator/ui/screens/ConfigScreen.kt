@@ -165,7 +165,7 @@ fun ConfigScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                SelectableCard(
+                SelectableCard<GameType>(
                     selected = state.config.gameType == GameType.REGULAR,
                     onClick = { viewModel.setGameType(GameType.REGULAR) },
                     title = GameType.REGULAR.titleAr,
@@ -174,7 +174,7 @@ fun ConfigScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                SelectableCard(
+                SelectableCard<GameType>(
                     selected = state.config.gameType == GameType.COMPLEX,
                     onClick = { viewModel.setGameType(GameType.COMPLEX) },
                     title = GameType.COMPLEX.titleAr,
@@ -198,14 +198,14 @@ fun ConfigScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    SelectableCard(
+                    SelectableCard<Boolean>(
                         selected = state.config.doublingEnabled,
                         onClick = { viewModel.setDoublingEnabled(true) },
                         title = "نعم (مع تدبيل)",
                         description = "مضاعفة الختيار والبنات",
                         modifier = Modifier.weight(1f)
                     )
-                    SelectableCard(
+                    SelectableCard<Boolean>(
                         selected = !state.config.doublingEnabled,
                         onClick = { viewModel.setDoublingEnabled(false) },
                         title = "لا (بدون تدبيل)",
@@ -231,7 +231,7 @@ fun ConfigScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    SelectableCard(
+                    SelectableCard<PartnerScoringRule>(
                         selected = state.config.partnerScoringRule == PartnerScoringRule.BOTH_TEAMS,
                         onClick = { viewModel.setPartnerScoringRule(PartnerScoringRule.BOTH_TEAMS) },
                         title = PartnerScoringRule.BOTH_TEAMS.titleAr,
@@ -239,7 +239,7 @@ fun ConfigScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    SelectableCard(
+                    SelectableCard<PartnerScoringRule>(
                         selected = state.config.partnerScoringRule == PartnerScoringRule.SINGLE_TEAM_NET,
                         onClick = { viewModel.setPartnerScoringRule(PartnerScoringRule.SINGLE_TEAM_NET) },
                         title = PartnerScoringRule.SINGLE_TEAM_NET.titleAr,
