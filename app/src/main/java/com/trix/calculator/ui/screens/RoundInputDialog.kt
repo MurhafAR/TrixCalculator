@@ -747,6 +747,7 @@ private fun KingInputSection(
         }
     }
 }
+}
 
 /**
  * إدخال كروت البنات (4 بنات) مع التدبيل
