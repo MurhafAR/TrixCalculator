@@ -136,7 +136,7 @@ fun ConfigScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                SelectableCard(
+                SelectableCard<GameMode>(
                     selected = state.config.gameMode == GameMode.INDIVIDUAL,
                     onClick = { viewModel.setGameMode(GameMode.INDIVIDUAL) },
                     title = GameMode.INDIVIDUAL.titleAr,
@@ -145,7 +145,7 @@ fun ConfigScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                SelectableCard(
+                SelectableCard<GameMode>(
                     selected = state.config.gameMode == GameMode.PARTNERS,
                     onClick = { viewModel.setGameMode(GameMode.PARTNERS) },
                     title = GameMode.PARTNERS.titleAr,
