@@ -304,7 +304,19 @@ fun RoundInputDialog(
                                             RoundedCornerShape(10.dp)
                                         )
                                         .clickable {
-                                            viewModel.updateDraftInput { it.copy(contractType = contract) }
+                                            viewModel.updateDraftInput { currentDraft ->
+                                                if (isPartners) {
+                                                    currentDraft.copy(
+                                                        contractType = contract,
+                                                        kingTakerId = currentDraft.kingTakerId ?: 0,
+                                                        queensTaken = if (currentDraft.queensTaken.isEmpty()) mapOf(0 to 2, 1 to 2, 2 to 0, 3 to 0) else currentDraft.queensTaken,
+                                                        diamondsTaken = if (currentDraft.diamondsTaken.isEmpty()) mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0) else currentDraft.diamondsTaken,
+                                                        lutoTricksTaken = if (currentDraft.lutoTricksTaken.isEmpty()) mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0) else currentDraft.lutoTricksTaken
+                                                    )
+                                                } else {
+                                                    currentDraft.copy(contractType = contract)
+                                                }
+                                            }
                                         }
                                         .padding(12.dp)
                                 ) {
@@ -336,7 +348,19 @@ fun RoundInputDialog(
                                         RadioButton(
                                             selected = selected,
                                             onClick = {
-                                                viewModel.updateDraftInput { it.copy(contractType = contract) }
+                                                viewModel.updateDraftInput { currentDraft ->
+                                                    if (isPartners) {
+                                                        currentDraft.copy(
+                                                            contractType = contract,
+                                                            kingTakerId = currentDraft.kingTakerId ?: 0,
+                                                            queensTaken = if (currentDraft.queensTaken.isEmpty()) mapOf(0 to 2, 1 to 2, 2 to 0, 3 to 0) else currentDraft.queensTaken,
+                                                            diamondsTaken = if (currentDraft.diamondsTaken.isEmpty()) mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0) else currentDraft.diamondsTaken,
+                                                            lutoTricksTaken = if (currentDraft.lutoTricksTaken.isEmpty()) mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0) else currentDraft.lutoTricksTaken
+                                                        )
+                                                    } else {
+                                                        currentDraft.copy(contractType = contract)
+                                                    }
+                                                }
                                             },
                                             colors = RadioButtonDefaults.colors(
                                                 selectedColor = GoldPrimary,
@@ -363,10 +387,10 @@ fun RoundInputDialog(
                             QueensInputSection(draft, viewModel, playerNames, config.doublingEnabled, isPartners)
                         }
                         ContractType.DIAMONDS -> {
-                            DiamondsInputSection(draft, viewModel, playerNames)
+                            DiamondsInputSection(draft, viewModel, playerNames, isPartners)
                         }
                         ContractType.LUTO -> {
-                            LutoInputSection(draft, viewModel, playerNames)
+                            LutoInputSection(draft, viewModel, playerNames, isPartners)
                         }
                         ContractType.COMPLEX -> {
                             ComplexInputSection(draft, viewModel, playerNames, config.doublingEnabled, isPartners)
@@ -797,47 +821,82 @@ private fun QueensInputSection(
         Spacer(modifier = Modifier.height(12.dp))
 
         if (isPartners) {
-            val team1Queens = (draft.queensTaken[0] ?: 0) + (draft.queensTaken[2] ?: 0)
-            val team2Queens = (draft.queensTaken[1] ?: 0) + (draft.queensTaken[3] ?: 0)
+            val team1Queens = ((draft.queensTaken[0] ?: 0) + (draft.queensTaken[2] ?: 0)).coerceIn(0, 4)
+            val team2Queens = 4 - team1Queens
 
-            NumberStepper(
-                value = team1Queens,
-                onValueChange = { newVal ->
-                    val updated = draft.queensTaken.toMutableMap()
-                    updated[0] = newVal
-                    updated[2] = 0
-                    val curDoubledT1 = draft.doubledQueens.count { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
-                    val newDoubled = if (curDoubledT1 > newVal) {
-                        val t2Doubled = draft.doubledQueens.filter { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
-                        t2Doubled + List(newVal) { DoubledQueenInfo(doublerPlayerId = 1, takerPlayerId = 0) }
-                    } else draft.doubledQueens
-                    viewModel.updateDraftInput { it.copy(queensTaken = updated, doubledQueens = newDoubled) }
-                },
-                minValue = 0,
-                maxValue = 4,
-                label = "الفريق 1 (${playerNames.getOrElse(0) { "1" }} و ${playerNames.getOrElse(2) { "3" }})",
-                accentColor = EmeraldAccent
+            Text(
+                text = "كم بنت أكل الفريق 1؟ (${playerNames.getOrElse(0) { "1" }} و ${playerNames.getOrElse(2) { "3" }})",
+                style = MaterialTheme.typography.titleSmall,
+                color = EmeraldAccent,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            NumberStepper(
-                value = team2Queens,
-                onValueChange = { newVal ->
-                    val updated = draft.queensTaken.toMutableMap()
-                    updated[1] = newVal
-                    updated[3] = 0
-                    val curDoubledT2 = draft.doubledQueens.count { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
-                    val newDoubled = if (curDoubledT2 > newVal) {
-                        val t1Doubled = draft.doubledQueens.filter { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
-                        t1Doubled + List(newVal) { DoubledQueenInfo(doublerPlayerId = 0, takerPlayerId = 1) }
-                    } else draft.doubledQueens
-                    viewModel.updateDraftInput { it.copy(queensTaken = updated, doubledQueens = newDoubled) }
-                },
-                minValue = 0,
-                maxValue = 4,
-                label = "الفريق 2 (${playerNames.getOrElse(1) { "2" }} و ${playerNames.getOrElse(3) { "4" }})",
-                accentColor = SlateBlueLight
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                (0..4).forEach { count ->
+                    val isSelected = draft.queensTaken.isNotEmpty() && team1Queens == count
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) EmeraldAccent else DarkBackground)
+                            .border(1.dp, if (isSelected) EmeraldAccent else BorderDark, RoundedCornerShape(10.dp))
+                            .clickable {
+                                val updated = mutableMapOf(
+                                    0 to count,
+                                    1 to (4 - count),
+                                    2 to 0,
+                                    3 to 0
+                                )
+                                val curDoubledT1 = draft.doubledQueens.count { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                                val curDoubledT2 = draft.doubledQueens.count { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
+                                val newT1Doubled = List(curDoubledT1.coerceAtMost(count)) { DoubledQueenInfo(1, 0) }
+                                val newT2Doubled = List(curDoubledT2.coerceAtMost(4 - count)) { DoubledQueenInfo(0, 1) }
+                                viewModel.updateDraftInput { it.copy(queensTaken = updated, doubledQueens = newT1Doubled + newT2Doubled) }
+                            }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "$count",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) DarkBackground else TextPrimary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = DarkBackground,
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "الفريق 1: $team1Queens بنات (${team1Queens * -25} نقطة)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EmeraldAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "الفريق 2: $team2Queens بنات (${team2Queens * -25} نقطة)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SlateBlueLight,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         } else {
             (0..3).forEach { pId ->
                 val count = draft.queensTaken[pId] ?: 0
@@ -864,44 +923,94 @@ private fun QueensInputSection(
             Spacer(modifier = Modifier.height(12.dp))
 
             if (isPartners) {
-                val team1Queens = (draft.queensTaken[0] ?: 0) + (draft.queensTaken[2] ?: 0)
-                val team2Queens = (draft.queensTaken[1] ?: 0) + (draft.queensTaken[3] ?: 0)
+                val team1Queens = ((draft.queensTaken[0] ?: 0) + (draft.queensTaken[2] ?: 0)).coerceIn(0, 4)
+                val team2Queens = 4 - team1Queens
                 val doubledT1 = draft.doubledQueens.count { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
                 val doubledT2 = draft.doubledQueens.count { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
 
                 SectionHeader(
                     title = "تدبيل البنات (+25 للفريق الآخر / -50 للآكل)",
-                    subtitle = "حدد كم بنت مدبلة أكلها كل فريق من بناته",
+                    subtitle = "حدد كم بنت مدبلة أكلها كل فريق إن وُجد",
                     icon = Icons.Default.Bolt
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                NumberStepper(
-                    value = doubledT1,
-                    onValueChange = { newVal ->
-                        val t2Doubled = draft.doubledQueens.filter { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
-                        val newT1Doubled = List(newVal) { DoubledQueenInfo(doublerPlayerId = 1, takerPlayerId = 0) }
-                        viewModel.updateDraftInput { it.copy(doubledQueens = t2Doubled + newT1Doubled) }
-                    },
-                    minValue = 0,
-                    maxValue = team1Queens,
-                    label = "بنات مدبلة أكلها الفريق 1",
-                    accentColor = EmeraldAccent
-                )
-                Spacer(modifier = Modifier.height(6.dp))
+                if (team1Queens > 0) {
+                    Text(
+                        text = "كم بنت مدبلة أكلها الفريق 1؟",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = EmeraldAccent
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        (0..team1Queens).forEach { dCount ->
+                            val isSelected = doubledT1 == dCount
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) CrimsonHeart else DarkBackground)
+                                    .border(1.dp, if (isSelected) CrimsonHeart else BorderDark, RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val t2Doubled = draft.doubledQueens.filter { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
+                                        val newT1Doubled = List(dCount) { DoubledQueenInfo(1, 0) }
+                                        viewModel.updateDraftInput { it.copy(doubledQueens = t2Doubled + newT1Doubled) }
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "$dCount",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) TextPrimary else TextSecondary
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
-                NumberStepper(
-                    value = doubledT2,
-                    onValueChange = { newVal ->
-                        val t1Doubled = draft.doubledQueens.filter { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
-                        val newT2Doubled = List(newVal) { DoubledQueenInfo(doublerPlayerId = 0, takerPlayerId = 1) }
-                        viewModel.updateDraftInput { it.copy(doubledQueens = t1Doubled + newT2Doubled) }
-                    },
-                    minValue = 0,
-                    maxValue = team2Queens,
-                    label = "بنات مدبلة أكلها الفريق 2",
-                    accentColor = SlateBlueLight
-                )
+                if (team2Queens > 0) {
+                    Text(
+                        text = "كم بنت مدبلة أكلها الفريق 2؟",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SlateBlueLight
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        (0..team2Queens).forEach { dCount ->
+                            val isSelected = doubledT2 == dCount
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) CrimsonHeart else DarkBackground)
+                                    .border(1.dp, if (isSelected) CrimsonHeart else BorderDark, RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val t1Doubled = draft.doubledQueens.filter { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                                        val newT2Doubled = List(dCount) { DoubledQueenInfo(0, 1) }
+                                        viewModel.updateDraftInput { it.copy(doubledQueens = t1Doubled + newT2Doubled) }
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "$dCount",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) TextPrimary else TextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
             } else {
                 SectionHeader(
                     title = "تدبيل البنات (+25 للمدبل / -50 للآكل)",
@@ -1010,7 +1119,8 @@ private fun QueensInputSection(
 private fun DiamondsInputSection(
     draft: RoundInput,
     viewModel: TrixViewModel,
-    playerNames: List<String>
+    playerNames: List<String>,
+    isPartners: Boolean = false
 ) {
     val totalDiamonds = (0..3).sumOf { draft.diamondsTaken[it] ?: 0 }
     val remaining = 13 - totalDiamonds
@@ -1022,7 +1132,7 @@ private fun DiamondsInputSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SectionHeader(
-                title = "الديناري (13 كرت إجمالاً)",
+                title = if (isPartners) "الديناري (13 كرت بين الفريقين)" else "الديناري (13 كرت إجمالاً)",
                 subtitle = "-10 نقاط لكل كرت ديناري",
                 icon = Icons.Default.Diamond
             )
@@ -1041,21 +1151,70 @@ private fun DiamondsInputSection(
         }
         Spacer(modifier = Modifier.height(12.dp))
 
-        (0..3).forEach { pId ->
-            val count = draft.diamondsTaken[pId] ?: 0
+        if (isPartners) {
+            val team1Diamonds = ((draft.diamondsTaken[0] ?: 0) + (draft.diamondsTaken[2] ?: 0)).coerceIn(0, 13)
+            val team2Diamonds = 13 - team1Diamonds
+
             NumberStepper(
-                value = count,
+                value = team1Diamonds,
                 onValueChange = { newVal ->
-                    val updated = draft.diamondsTaken.toMutableMap()
-                    updated[pId] = newVal
+                    val updated = mutableMapOf(
+                        0 to newVal,
+                        1 to (13 - newVal),
+                        2 to 0,
+                        3 to 0
+                    )
                     viewModel.updateDraftInput { it.copy(diamondsTaken = updated) }
                 },
                 minValue = 0,
                 maxValue = 13,
-                label = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
-                accentColor = SlateBlueLight
+                label = "ديناري الفريق 1 (${playerNames.getOrElse(0) { "1" }} و ${playerNames.getOrElse(2) { "3" }})",
+                accentColor = EmeraldAccent
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = DarkBackground,
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "الفريق 1: $team1Diamonds كرت (${team1Diamonds * -10} نقطة)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EmeraldAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "الفريق 2: $team2Diamonds كرت (${team2Diamonds * -10} نقطة)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SlateBlueLight,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            (0..3).forEach { pId ->
+                val count = draft.diamondsTaken[pId] ?: 0
+                NumberStepper(
+                    value = count,
+                    onValueChange = { newVal ->
+                        val updated = draft.diamondsTaken.toMutableMap()
+                        updated[pId] = newVal
+                        viewModel.updateDraftInput { it.copy(diamondsTaken = updated) }
+                    },
+                    minValue = 0,
+                    maxValue = 13,
+                    label = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
+                    accentColor = SlateBlueLight
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
         }
     }
 }
@@ -1067,7 +1226,8 @@ private fun DiamondsInputSection(
 private fun LutoInputSection(
     draft: RoundInput,
     viewModel: TrixViewModel,
-    playerNames: List<String>
+    playerNames: List<String>,
+    isPartners: Boolean = false
 ) {
     val totalLuto = (0..3).sumOf { draft.lutoTricksTaken[it] ?: 0 }
     val remaining = 13 - totalLuto
@@ -1079,7 +1239,7 @@ private fun LutoInputSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SectionHeader(
-                title = "اللطوش (13 أكلة إجمالاً)",
+                title = if (isPartners) "اللطوش (13 أكلة بين الفريقين)" else "اللطوش (13 أكلة إجمالاً)",
                 subtitle = "-15 نقطة لكل أكلة لطوش",
                 icon = Icons.Default.Layers
             )
@@ -1098,21 +1258,70 @@ private fun LutoInputSection(
         }
         Spacer(modifier = Modifier.height(12.dp))
 
-        (0..3).forEach { pId ->
-            val count = draft.lutoTricksTaken[pId] ?: 0
+        if (isPartners) {
+            val team1Luto = ((draft.lutoTricksTaken[0] ?: 0) + (draft.lutoTricksTaken[2] ?: 0)).coerceIn(0, 13)
+            val team2Luto = 13 - team1Luto
+
             NumberStepper(
-                value = count,
+                value = team1Luto,
                 onValueChange = { newVal ->
-                    val updated = draft.lutoTricksTaken.toMutableMap()
-                    updated[pId] = newVal
+                    val updated = mutableMapOf(
+                        0 to newVal,
+                        1 to (13 - newVal),
+                        2 to 0,
+                        3 to 0
+                    )
                     viewModel.updateDraftInput { it.copy(lutoTricksTaken = updated) }
                 },
                 minValue = 0,
                 maxValue = 13,
-                label = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
+                label = "أكلات الفريق 1 (${playerNames.getOrElse(0) { "1" }} و ${playerNames.getOrElse(2) { "3" }})",
                 accentColor = EmeraldAccent
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = DarkBackground,
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "الفريق 1: $team1Luto أكلة (${team1Luto * -15} نقطة)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = EmeraldAccent,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "الفريق 2: $team2Luto أكلة (${team2Luto * -15} نقطة)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SlateBlueLight,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            (0..3).forEach { pId ->
+                val count = draft.lutoTricksTaken[pId] ?: 0
+                NumberStepper(
+                    value = count,
+                    onValueChange = { newVal ->
+                        val updated = draft.lutoTricksTaken.toMutableMap()
+                        updated[pId] = newVal
+                        viewModel.updateDraftInput { it.copy(lutoTricksTaken = updated) }
+                    },
+                    minValue = 0,
+                    maxValue = 13,
+                    label = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
+                    accentColor = EmeraldAccent
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
         }
     }
 }
@@ -1169,9 +1378,9 @@ private fun ComplexInputSection(
         QueensInputSection(draft, viewModel, playerNames, doublingEnabled, isPartners)
 
         // 3. ديناري الكومبلكس
-        DiamondsInputSection(draft, viewModel, playerNames)
+        DiamondsInputSection(draft, viewModel, playerNames, isPartners)
 
         // 4. لطوش الكومبلكس
-        LutoInputSection(draft, viewModel, playerNames)
+        LutoInputSection(draft, viewModel, playerNames, isPartners)
     }
 }

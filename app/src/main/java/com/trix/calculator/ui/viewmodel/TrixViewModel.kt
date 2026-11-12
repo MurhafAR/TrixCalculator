@@ -100,13 +100,27 @@ class TrixViewModel : ViewModel() {
         } else {
             ContractType.KING_OF_HEARTS
         }
+        val isPartners = _uiState.value.config.gameMode == GameMode.PARTNERS
+        val initialDraft = if (isPartners) {
+            RoundInput(
+                kingdomOwnerId = 0,
+                contractType = defaultContract,
+                kingTakerId = 0,
+                queensTaken = mapOf(0 to 2, 1 to 2, 2 to 0, 3 to 0),
+                diamondsTaken = mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0),
+                lutoTricksTaken = mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0)
+            )
+        } else {
+            RoundInput(kingdomOwnerId = 0, contractType = defaultContract)
+        }
+
         _uiState.update {
             it.copy(
                 currentScreen = AppScreen.GAME_DASHBOARD,
                 activeKingdomOwnerId = 0,
                 rounds = emptyList(),
                 undoneRounds = emptyList(),
-                draftInput = RoundInput(kingdomOwnerId = 0, contractType = defaultContract)
+                draftInput = initialDraft
             )
         }
     }
@@ -143,14 +157,28 @@ class TrixViewModel : ViewModel() {
         val available = getAvailableContracts(targetOwner)
         val initialContract = available.firstOrNull() ?: if (state.config.gameType == GameType.COMPLEX) ContractType.COMPLEX else ContractType.TRIX
 
+        val isPartners = state.config.gameMode == GameMode.PARTNERS
+        val initialDraft = if (isPartners) {
+            RoundInput(
+                kingdomOwnerId = targetOwner,
+                contractType = initialContract,
+                kingTakerId = 0,
+                queensTaken = mapOf(0 to 2, 1 to 2, 2 to 0, 3 to 0),
+                diamondsTaken = mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0),
+                lutoTricksTaken = mapOf(0 to 7, 1 to 6, 2 to 0, 3 to 0)
+            )
+        } else {
+            RoundInput(
+                kingdomOwnerId = targetOwner,
+                contractType = initialContract
+            )
+        }
+
         _uiState.update {
             it.copy(
                 isRoundInputActive = true,
                 editingRoundIndex = null,
-                draftInput = RoundInput(
-                    kingdomOwnerId = targetOwner,
-                    contractType = initialContract
-                ),
+                draftInput = initialDraft,
                 validationError = null
             )
         }
