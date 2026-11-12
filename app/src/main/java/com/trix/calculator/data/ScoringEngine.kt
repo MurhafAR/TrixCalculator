@@ -41,16 +41,37 @@ object ScoringEngine {
     /**
      * حساب نقاط ختيار الكبة (الشيخ)
      * مع تطبيق قواعد التدبيل السورية:
-     * - إذا لم يدبل: الآكل -75
-     * - إذا دبل: الآكل -150، والمدبل +75
-     * - إذا دبل اللاعب الختيار وأكله بنفسه: ينزل عليه -150 كاملة
+     * - في الفردي:
+     *   - إذا لم يدبل: الآكل -75
+     *   - إذا دبل: الآكل -150، والمدبل +75
+     *   - إذا دبل اللاعب الختيار وأكله بنفسه: ينزل عليه -150 كاملة
+     * - في الشراكة:
+     *   - إذا لم يدبل: الفريق الآكل -75
+     *   - إذا دبل: الفريق الآكل ينزل عليه -150، والفريق الآخر الذي لم يأكل يحصل على +75
      */
     fun calculateKingScores(
         takerId: Int,
         doublerId: Int?,
-        doublingEnabled: Boolean
+        doublingEnabled: Boolean,
+        gameMode: GameMode = GameMode.INDIVIDUAL
     ): Map<Int, Int> {
         val scores = mutableMapOf(0 to 0, 1 to 0, 2 to 0, 3 to 0)
+
+        if (gameMode == GameMode.PARTNERS) {
+            val takerTeam = if (takerId == 0 || takerId == 2) 1 else 2
+            val takerPrimaryId = if (takerTeam == 1) 0 else 1
+            val otherPrimaryId = if (takerTeam == 1) 1 else 0
+
+            if (!doublingEnabled || doublerId == null) {
+                // بدون تدبيل: -75 للفريق الآكل
+                scores[takerPrimaryId] = KING_BASE_PENALTY
+            } else {
+                // مع التدبيل: -150 للفريق الآكل، و+75 للفريق الآخر الذي لم يأكل
+                scores[takerPrimaryId] = KING_DOUBLED_PENALTY
+                scores[otherPrimaryId] = KING_DOUBLER_REWARD
+            }
+            return scores
+        }
 
         if (!doublingEnabled || doublerId == null) {
             // بدون تدبيل
@@ -69,14 +90,56 @@ object ScoringEngine {
     /**
      * حساب نقاط البنات
      * 4 بنات، -25 لكل بنت
-     * مع التدبيل: البنت المدبلة -50 على الآكل، و+25 للمدبل (إلا إذا أكلها المدبل بنفسه فتكون -50 عليه)
+     * مع التدبيل:
+     * - في الفردي: البنت المدبلة -50 على الآكل، و+25 للمدبل (إلا إذا أكلها المدبل بنفسه فتكون -50 عليه)
+     * - في الشراكة: البنت المدبلة -50 على الفريق الآكل، و+25 للفريق الآخر الذي لم يأكلها
      */
     fun calculateQueensScores(
         queensTaken: Map<Int, Int>,
         doubledQueens: List<DoubledQueenInfo>,
-        doublingEnabled: Boolean
+        doublingEnabled: Boolean,
+        gameMode: GameMode = GameMode.INDIVIDUAL
     ): Map<Int, Int> {
         val scores = mutableMapOf(0 to 0, 1 to 0, 2 to 0, 3 to 0)
+
+        if (gameMode == GameMode.PARTNERS) {
+            val team1Queens = (queensTaken[0] ?: 0) + (queensTaken[2] ?: 0)
+            val team2Queens = (queensTaken[1] ?: 0) + (queensTaken[3] ?: 0)
+
+            if (!doublingEnabled || doubledQueens.isEmpty()) {
+                scores[0] = team1Queens * QUEEN_BASE_PENALTY
+                scores[1] = team2Queens * QUEEN_BASE_PENALTY
+                return scores
+            }
+
+            // حساب البنات المدبلة التي أكلها كل فريق
+            var doubledTeam1 = 0
+            var doubledTeam2 = 0
+            for (info in doubledQueens) {
+                if (info.takerPlayerId == 0 || info.takerPlayerId == 2) {
+                    doubledTeam1++
+                } else if (info.takerPlayerId == 1 || info.takerPlayerId == 3) {
+                    doubledTeam2++
+                }
+            }
+
+            val undoubledTeam1 = (team1Queens - doubledTeam1).coerceAtLeast(0)
+            val undoubledTeam2 = (team2Queens - doubledTeam2).coerceAtLeast(0)
+
+            // الفريق 1: بناته العادية (-25) + بناته المدبلة (-50) + مكافأة البنات المدبلة التي أكلها الفريق 2 (+25)
+            val team1Score = (undoubledTeam1 * QUEEN_BASE_PENALTY) +
+                    (doubledTeam1 * QUEEN_DOUBLED_PENALTY) +
+                    (doubledTeam2 * QUEEN_DOUBLER_REWARD)
+
+            // الفريق 2: بناته العادية (-25) + بناته المدبلة (-50) + مكافأة البنات المدبلة التي أكلها الفريق 1 (+25)
+            val team2Score = (undoubledTeam2 * QUEEN_BASE_PENALTY) +
+                    (doubledTeam2 * QUEEN_DOUBLED_PENALTY) +
+                    (doubledTeam1 * QUEEN_DOUBLER_REWARD)
+
+            scores[0] = team1Score
+            scores[1] = team2Score
+            return scores
+        }
 
         if (!doublingEnabled || doubledQueens.isEmpty()) {
             for (playerId in 0..3) {
@@ -147,20 +210,21 @@ object ScoringEngine {
         doubledQueens: List<DoubledQueenInfo>,
         diamondsTaken: Map<Int, Int>,
         lutoTricksTaken: Map<Int, Int>,
-        doublingEnabled: Boolean
+        doublingEnabled: Boolean,
+        gameMode: GameMode = GameMode.INDIVIDUAL
     ): Map<Int, Int> {
         val scores = mutableMapOf(0 to 0, 1 to 0, 2 to 0, 3 to 0)
 
         // 1. ختيار الكبة
         if (kingTakerId != null) {
-            val kingScores = calculateKingScores(kingTakerId, kingDoublerId, doublingEnabled)
+            val kingScores = calculateKingScores(kingTakerId, kingDoublerId, doublingEnabled, gameMode)
             for (playerId in 0..3) {
                 scores[playerId] = (scores[playerId] ?: 0) + (kingScores[playerId] ?: 0)
             }
         }
 
         // 2. البنات
-        val queensScores = calculateQueensScores(queensTaken, doubledQueens, doublingEnabled)
+        val queensScores = calculateQueensScores(queensTaken, doubledQueens, doublingEnabled, gameMode)
         for (playerId in 0..3) {
             scores[playerId] = (scores[playerId] ?: 0) + (queensScores[playerId] ?: 0)
         }
@@ -185,16 +249,17 @@ object ScoringEngine {
      */
     fun calculateRoundScores(
         input: RoundInput,
-        doublingEnabled: Boolean
+        doublingEnabled: Boolean,
+        gameMode: GameMode = GameMode.INDIVIDUAL
     ): Map<Int, Int> {
         return when (input.contractType) {
             ContractType.TRIX -> calculateTrixScores(input.trixRankings)
             ContractType.KING_OF_HEARTS -> {
                 val taker = input.kingTakerId ?: 0
-                calculateKingScores(taker, input.kingDoublerId, doublingEnabled)
+                calculateKingScores(taker, input.kingDoublerId, doublingEnabled, gameMode)
             }
             ContractType.QUEENS -> {
-                calculateQueensScores(input.queensTaken, input.doubledQueens, doublingEnabled)
+                calculateQueensScores(input.queensTaken, input.doubledQueens, doublingEnabled, gameMode)
             }
             ContractType.DIAMONDS -> {
                 calculateDiamondsScores(input.diamondsTaken)
@@ -210,7 +275,8 @@ object ScoringEngine {
                     doubledQueens = input.doubledQueens,
                     diamondsTaken = input.diamondsTaken,
                     lutoTricksTaken = input.lutoTricksTaken,
-                    doublingEnabled = doublingEnabled
+                    doublingEnabled = doublingEnabled,
+                    gameMode = gameMode
                 )
             }
         }
@@ -256,7 +322,8 @@ object ScoringEngine {
      */
     fun validateRoundInput(
         input: RoundInput,
-        doublingEnabled: Boolean
+        doublingEnabled: Boolean,
+        gameMode: GameMode = GameMode.INDIVIDUAL
     ): ValidationResult {
         when (input.contractType) {
             ContractType.TRIX -> {
@@ -272,10 +339,11 @@ object ScoringEngine {
             }
             ContractType.KING_OF_HEARTS -> {
                 if (input.kingTakerId == null || input.kingTakerId !in 0..3) {
-                    return ValidationResult(false, "يرجى تحديد اللاعب الذي أكل ختيار الكبة.")
+                    val msg = if (gameMode == GameMode.PARTNERS) "يرجى تحديد الفريق الذي أكل ختيار الكبة." else "يرجى تحديد اللاعب الذي أكل ختيار الكبة."
+                    return ValidationResult(false, msg)
                 }
                 if (doublingEnabled && input.kingDoublerId != null && input.kingDoublerId !in 0..3) {
-                    return ValidationResult(false, "اللاعب المدبل غير صالح.")
+                    return ValidationResult(false, "جهة التدبيل غير صالحة.")
                 }
             }
             ContractType.QUEENS -> {
@@ -287,14 +355,27 @@ object ScoringEngine {
                     if (input.doubledQueens.size > 4) {
                         return ValidationResult(false, "لا يمكن تدبيل أكثر من 4 بنات.")
                     }
-                    val doubledPerTaker = input.doubledQueens.groupingBy { it.takerPlayerId }.eachCount()
-                    for ((takerId, count) in doubledPerTaker) {
-                        val taken = input.queensTaken[takerId] ?: 0
-                        if (count > taken) {
-                            return ValidationResult(
-                                false,
-                                "اللاعب رقم ${takerId + 1} أكل $taken بنات فقط، فلا يمكن أن يأكل $count بنات مدبلة!"
-                            )
+                    if (gameMode == GameMode.PARTNERS) {
+                        val team1Queens = (input.queensTaken[0] ?: 0) + (input.queensTaken[2] ?: 0)
+                        val team2Queens = (input.queensTaken[1] ?: 0) + (input.queensTaken[3] ?: 0)
+                        val doubledTeam1 = input.doubledQueens.count { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                        val doubledTeam2 = input.doubledQueens.count { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
+                        if (doubledTeam1 > team1Queens) {
+                            return ValidationResult(false, "الفريق 1 أكل $team1Queens بنات فقط، فلا يمكن تدبيل $doubledTeam1 بنات له!")
+                        }
+                        if (doubledTeam2 > team2Queens) {
+                            return ValidationResult(false, "الفريق 2 أكل $team2Queens بنات فقط، فلا يمكن تدبيل $doubledTeam2 بنات له!")
+                        }
+                    } else {
+                        val doubledPerTaker = input.doubledQueens.groupingBy { it.takerPlayerId }.eachCount()
+                        for ((takerId, count) in doubledPerTaker) {
+                            val taken = input.queensTaken[takerId] ?: 0
+                            if (count > taken) {
+                                return ValidationResult(
+                                    false,
+                                    "اللاعب رقم ${takerId + 1} أكل $taken بنات فقط، فلا يمكن أن يأكل $count بنات مدبلة!"
+                                )
+                            }
                         }
                     }
                 }
@@ -314,7 +395,8 @@ object ScoringEngine {
             ContractType.COMPLEX -> {
                 // في الكومبلكس: فحص الختيار
                 if (input.kingTakerId == null || input.kingTakerId !in 0..3) {
-                    return ValidationResult(false, "يرجى تحديد اللاعب الذي أكل ختيار الكبة في الكومبلكس.")
+                    val msg = if (gameMode == GameMode.PARTNERS) "يرجى تحديد الفريق الذي أكل ختيار الكبة في الكومبلكس." else "يرجى تحديد اللاعب الذي أكل ختيار الكبة في الكومبلكس."
+                    return ValidationResult(false, msg)
                 }
                 // فحص البنات
                 val totalQueens = (0..3).sumOf { input.queensTaken[it] ?: 0 }
@@ -326,14 +408,27 @@ object ScoringEngine {
                     if (input.doubledQueens.size > 4) {
                         return ValidationResult(false, "لا يمكن تدبيل أكثر من 4 بنات في الكومبلكس.")
                     }
-                    val doubledPerTaker = input.doubledQueens.groupingBy { it.takerPlayerId }.eachCount()
-                    for ((takerId, count) in doubledPerTaker) {
-                        val taken = input.queensTaken[takerId] ?: 0
-                        if (count > taken) {
-                            return ValidationResult(
-                                false,
-                                "في الكومبلكس: اللاعب رقم ${takerId + 1} أكل $taken بنات فقط، فلا يمكن أن يأكل $count بنات مدبلة!"
-                            )
+                    if (gameMode == GameMode.PARTNERS) {
+                        val team1Queens = (input.queensTaken[0] ?: 0) + (input.queensTaken[2] ?: 0)
+                        val team2Queens = (input.queensTaken[1] ?: 0) + (input.queensTaken[3] ?: 0)
+                        val doubledTeam1 = input.doubledQueens.count { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                        val doubledTeam2 = input.doubledQueens.count { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
+                        if (doubledTeam1 > team1Queens) {
+                            return ValidationResult(false, "في الكومبلكس: الفريق 1 أكل $team1Queens بنات فقط، فلا يمكن تدبيل $doubledTeam1 بنات له!")
+                        }
+                        if (doubledTeam2 > team2Queens) {
+                            return ValidationResult(false, "في الكومبلكس: الفريق 2 أكل $team2Queens بنات فقط، فلا يمكن تدبيل $doubledTeam2 بنات له!")
+                        }
+                    } else {
+                        val doubledPerTaker = input.doubledQueens.groupingBy { it.takerPlayerId }.eachCount()
+                        for ((takerId, count) in doubledPerTaker) {
+                            val taken = input.queensTaken[takerId] ?: 0
+                            if (count > taken) {
+                                return ValidationResult(
+                                    false,
+                                    "في الكومبلكس: اللاعب رقم ${takerId + 1} أكل $taken بنات فقط، فلا يمكن أن يأكل $count بنات مدبلة!"
+                                )
+                            }
                         }
                     }
                 }

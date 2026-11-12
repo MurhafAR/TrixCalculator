@@ -200,7 +200,7 @@ class TrixViewModel : ViewModel() {
     fun submitDraftRound(): Boolean {
         val state = _uiState.value
         val draft = state.draftInput
-        val validation = ScoringEngine.validateRoundInput(draft, state.config.doublingEnabled)
+        val validation = ScoringEngine.validateRoundInput(draft, state.config.doublingEnabled, state.config.gameMode)
 
         if (!validation.isValid) {
             _uiState.update { it.copy(validationError = validation.errorMessage) }
@@ -208,7 +208,7 @@ class TrixViewModel : ViewModel() {
         }
 
         // حساب نقاط الدور
-        val calculatedScores = ScoringEngine.calculateRoundScores(draft, state.config.doublingEnabled)
+        val calculatedScores = ScoringEngine.calculateRoundScores(draft, state.config.doublingEnabled, state.config.gameMode)
 
         if (state.editingRoundIndex != null) {
             // تعديل جولة سابقة في مكانها

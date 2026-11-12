@@ -48,9 +48,11 @@ fun RoundInputDialog(
     val playerNames = config.playerNames
     val scrollState = rememberScrollState()
 
+    val isPartners = config.gameMode == GameMode.PARTNERS
+
     // معاينة النقاط المباشرة
-    val previewScores = remember(draft, config.doublingEnabled) {
-        ScoringEngine.calculateRoundScores(draft, config.doublingEnabled)
+    val previewScores = remember(draft, config.doublingEnabled, config.gameMode) {
+        ScoringEngine.calculateRoundScores(draft, config.doublingEnabled, config.gameMode)
     }
 
     Dialog(
@@ -144,16 +146,39 @@ fun RoundInputDialog(
                                 horizontalArrangement = Arrangement.SpaceAround,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                (0..3).forEach { pId ->
-                                    val pts = previewScores[pId] ?: 0
+                                if (isPartners) {
+                                    val t1Score = (previewScores[0] ?: 0) + (previewScores[2] ?: 0)
+                                    val t2Score = (previewScores[1] ?: 0) + (previewScores[3] ?: 0)
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(
-                                            text = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
+                                            text = "الفريق 1 (${playerNames.getOrElse(0) { "" }} و ${playerNames.getOrElse(2) { "" }})",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = TextSecondary,
-                                            maxLines = 1
+                                            color = EmeraldAccent,
+                                            fontWeight = FontWeight.Bold
                                         )
-                                        ScoreBadge(score = pts, fontSize = 13)
+                                        ScoreBadge(score = t1Score, fontSize = 14)
+                                    }
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = "الفريق 2 (${playerNames.getOrElse(1) { "" }} و ${playerNames.getOrElse(3) { "" }})",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = SlateBlueLight,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        ScoreBadge(score = t2Score, fontSize = 14)
+                                    }
+                                } else {
+                                    (0..3).forEach { pId ->
+                                        val pts = previewScores[pId] ?: 0
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = TextSecondary,
+                                                maxLines = 1
+                                            )
+                                            ScoreBadge(score = pts, fontSize = 13)
+                                        }
                                     }
                                 }
                             }
@@ -332,10 +357,10 @@ fun RoundInputDialog(
                             TrixInputSection(draft, viewModel, playerNames)
                         }
                         ContractType.KING_OF_HEARTS -> {
-                            KingInputSection(draft, viewModel, playerNames, config.doublingEnabled)
+                            KingInputSection(draft, viewModel, playerNames, config.doublingEnabled, isPartners)
                         }
                         ContractType.QUEENS -> {
-                            QueensInputSection(draft, viewModel, playerNames, config.doublingEnabled)
+                            QueensInputSection(draft, viewModel, playerNames, config.doublingEnabled, isPartners)
                         }
                         ContractType.DIAMONDS -> {
                             DiamondsInputSection(draft, viewModel, playerNames)
@@ -344,7 +369,7 @@ fun RoundInputDialog(
                             LutoInputSection(draft, viewModel, playerNames)
                         }
                         ContractType.COMPLEX -> {
-                            ComplexInputSection(draft, viewModel, playerNames, config.doublingEnabled)
+                            ComplexInputSection(draft, viewModel, playerNames, config.doublingEnabled, isPartners)
                         }
                     }
 
@@ -462,46 +487,142 @@ private fun KingInputSection(
     draft: RoundInput,
     viewModel: TrixViewModel,
     playerNames: List<String>,
-    doublingEnabled: Boolean
+    doublingEnabled: Boolean,
+    isPartners: Boolean = false
 ) {
     TrixCard {
         SectionHeader(
-            title = "من أكل ختيار الكبة (الشيخ)؟",
-            subtitle = "يخصم منه -75 نقطة (أو -150 إذا كان مدبلاً)",
+            title = if (isPartners) "أي فريق أكل ختيار الكبة (الشيخ)؟" else "من أكل ختيار الكبة (الشيخ)؟",
+            subtitle = if (doublingEnabled) {
+                if (isPartners)
+                    "الآكل ينزل عليه -75 (أو -150 إذا كان مدبلاً ويحصل الفريق الآخر على +75)"
+                else
+                    "يخصم منه -75 نقطة (أو -150 إذا كان مدبلاً)"
+            } else {
+                "يخصم من الفريق الآكل -75 نقطة"
+            },
             icon = Icons.Default.Favorite
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            (0..3).forEach { pId ->
-                val isTaker = draft.kingTakerId == pId
+        if (isPartners) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val isTeam1 = draft.kingTakerId == 0 || draft.kingTakerId == 2
+                val isTeam2 = draft.kingTakerId == 1 || draft.kingTakerId == 3
+
+                // الفريق 1
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isTaker) CrimsonHeart.copy(alpha = 0.2f) else DarkBackground)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isTeam1) EmeraldAccent.copy(alpha = 0.2f) else DarkBackground)
                         .border(
-                            if (isTaker) 2.dp else 1.dp,
-                            if (isTaker) CrimsonHeart else BorderDark,
-                            RoundedCornerShape(10.dp)
+                            if (isTeam1) 2.dp else 1.dp,
+                            if (isTeam1) EmeraldAccent else BorderDark,
+                            RoundedCornerShape(12.dp)
                         )
                         .clickable {
-                            viewModel.updateDraftInput { it.copy(kingTakerId = pId) }
+                            viewModel.updateDraftInput {
+                                it.copy(
+                                    kingTakerId = 0,
+                                    kingDoublerId = if (it.kingDoublerId != null) 1 else null
+                                )
+                            }
                         }
-                        .padding(vertical = 12.dp, horizontal = 4.dp),
+                        .padding(vertical = 14.dp, horizontal = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isTaker) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isTaker) CrimsonHeart else TextPrimary,
+                            text = "الفريق 1",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isTeam1) EmeraldAccent else TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${playerNames.getOrElse(0) { "1" }} و ${playerNames.getOrElse(2) { "3" }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
                             maxLines = 1
                         )
+                    }
+                }
+
+                // الفريق 2
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isTeam2) SlateBlueLight.copy(alpha = 0.2f) else DarkBackground)
+                        .border(
+                            if (isTeam2) 2.dp else 1.dp,
+                            if (isTeam2) SlateBlueLight else BorderDark,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable {
+                            viewModel.updateDraftInput {
+                                it.copy(
+                                    kingTakerId = 1,
+                                    kingDoublerId = if (it.kingDoublerId != null) 0 else null
+                                )
+                            }
+                        }
+                        .padding(vertical = 14.dp, horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "الفريق 2",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isTeam2) SlateBlueLight else TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${playerNames.getOrElse(1) { "2" }} و ${playerNames.getOrElse(3) { "4" }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                (0..3).forEach { pId ->
+                    val isTaker = draft.kingTakerId == pId
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isTaker) CrimsonHeart.copy(alpha = 0.2f) else DarkBackground)
+                            .border(
+                                if (isTaker) 2.dp else 1.dp,
+                                if (isTaker) CrimsonHeart else BorderDark,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                viewModel.updateDraftInput { it.copy(kingTakerId = pId) }
+                            }
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isTaker) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isTaker) CrimsonHeart else TextPrimary,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
@@ -515,45 +636,99 @@ private fun KingInputSection(
 
             SectionHeader(
                 title = "تدبيل الختيار",
-                subtitle = "المدبل يحصل على +75، والآكل ينزل عليه -150 (إلا إذا أكلها المدبل فينزل عليه -150)",
+                subtitle = if (isPartners)
+                    "المدبل ينزل -150 على الفريق الآكل، و+75 للفريق الآخر الذي لم يأكل"
+                else
+                    "المدبل يحصل على +75، والآكل ينزل عليه -150 (إلا إذا أكلها المدبل فينزل عليه -150)",
                 icon = Icons.Default.Bolt
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // خيار بدون تدبيل
-                val isNotDoubled = draft.kingDoublerId == null
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isNotDoubled) GoldPrimary.copy(alpha = 0.2f) else DarkBackground)
-                        .border(1.dp, if (isNotDoubled) GoldPrimary else BorderDark, RoundedCornerShape(10.dp))
-                        .clickable {
-                            viewModel.updateDraftInput { it.copy(kingDoublerId = null) }
-                        }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+            if (isPartners) {
+                val isDoubled = draft.kingDoublerId != null
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = "لم يُدبَّل",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isNotDoubled) GoldPrimary else TextSecondary
-                    )
-                }
-
-                // خيارات اللاعبين المدبلين
-                (0..3).forEach { pId ->
-                    val isDoubler = draft.kingDoublerId == pId
+                    // خيار بدون تدبيل
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (isDoubler) GoldPrimary.copy(alpha = 0.2f) else DarkBackground)
-                            .border(1.dp, if (isDoubler) GoldPrimary else BorderDark, RoundedCornerShape(10.dp))
+                            .background(if (!isDoubled) GoldPrimary.copy(alpha = 0.2f) else DarkBackground)
+                            .border(1.dp, if (!isDoubled) GoldPrimary else BorderDark, RoundedCornerShape(10.dp))
+                            .clickable {
+                                viewModel.updateDraftInput { it.copy(kingDoublerId = null) }
+                            }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "لم يُدبَّل (عادي -75)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (!isDoubled) FontWeight.Bold else FontWeight.Normal,
+                            color = if (!isDoubled) GoldPrimary else TextSecondary
+                        )
+                    }
+
+                    // خيار مدبل
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isDoubled) CrimsonHeart.copy(alpha = 0.2f) else DarkBackground)
+                            .border(1.dp, if (isDoubled) CrimsonHeart else BorderDark, RoundedCornerShape(10.dp))
+                            .clickable {
+                                val currentTaker = draft.kingTakerId ?: 0
+                                val otherTeam = if (currentTaker == 0 || currentTaker == 2) 1 else 0
+                                viewModel.updateDraftInput { it.copy(kingDoublerId = otherTeam) }
+                            }
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "مدبَّل ⚡ (-150 / +75)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDoubled) CrimsonHeart else TextSecondary
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // خيار بدون تدبيل
+                    val isNotDoubled = draft.kingDoublerId == null
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isNotDoubled) GoldPrimary.copy(alpha = 0.2f) else DarkBackground)
+                            .border(1.dp, if (isNotDoubled) GoldPrimary else BorderDark, RoundedCornerShape(10.dp))
+                            .clickable {
+                                viewModel.updateDraftInput { it.copy(kingDoublerId = null) }
+                            }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "لم يُدبَّل",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isNotDoubled) GoldPrimary else TextSecondary
+                        )
+                    }
+
+                    // خيارات اللاعبين المدبلين
+                    (0..3).forEach { pId ->
+                        val isDoubler = draft.kingDoublerId == pId
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isDoubler) GoldPrimary.copy(alpha = 0.2f) else DarkBackground)
+                                .border(1.dp, if (isDoubler) GoldPrimary else BorderDark, RoundedCornerShape(10.dp))
                             .clickable {
                                 viewModel.updateDraftInput { it.copy(kingDoublerId = pId) }
                             }
@@ -581,7 +756,8 @@ private fun QueensInputSection(
     draft: RoundInput,
     viewModel: TrixViewModel,
     playerNames: List<String>,
-    doublingEnabled: Boolean
+    doublingEnabled: Boolean,
+    isPartners: Boolean = false
 ) {
     val totalQueens = (0..3).sumOf { draft.queensTaken[it] ?: 0 }
     val remainingQueens = 4 - totalQueens
@@ -593,8 +769,15 @@ private fun QueensInputSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SectionHeader(
-                title = "البنات (4 بنات إجمالاً)",
-                subtitle = "-25 نقطة لكل بنت (-50 للبنت المدبلة)",
+                title = if (isPartners) "البنات (4 بنات إجمالاً)" else "البنات (4 بنات إجمالاً)",
+                subtitle = if (doublingEnabled) {
+                    if (isPartners)
+                        "-25 لكل بنت (-50 إذا دُبّلت ويحصل الفريق الآخر على +25)"
+                    else
+                        "-25 نقطة لكل بنت (-50 للبنت المدبلة)"
+                } else {
+                    "-25 نقطة لكل بنت"
+                },
                 icon = Icons.Default.Face
             )
             Surface(
@@ -612,21 +795,65 @@ private fun QueensInputSection(
         }
         Spacer(modifier = Modifier.height(12.dp))
 
-        (0..3).forEach { pId ->
-            val count = draft.queensTaken[pId] ?: 0
+        if (isPartners) {
+            val team1Queens = (draft.queensTaken[0] ?: 0) + (draft.queensTaken[2] ?: 0)
+            val team2Queens = (draft.queensTaken[1] ?: 0) + (draft.queensTaken[3] ?: 0)
+
             NumberStepper(
-                value = count,
+                value = team1Queens,
                 onValueChange = { newVal ->
                     val updated = draft.queensTaken.toMutableMap()
-                    updated[pId] = newVal
-                    viewModel.updateDraftInput { it.copy(queensTaken = updated) }
+                    updated[0] = newVal
+                    updated[2] = 0
+                    val curDoubledT1 = draft.doubledQueens.count { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                    val newDoubled = if (curDoubledT1 > newVal) {
+                        val t2Doubled = draft.doubledQueens.filter { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
+                        t2Doubled + List(newVal) { DoubledQueenInfo(doublerPlayerId = 1, takerPlayerId = 0) }
+                    } else draft.doubledQueens
+                    viewModel.updateDraftInput { it.copy(queensTaken = updated, doubledQueens = newDoubled) }
                 },
                 minValue = 0,
                 maxValue = 4,
-                label = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
-                accentColor = CrimsonHeart
+                label = "الفريق 1 (${playerNames.getOrElse(0) { "1" }} و ${playerNames.getOrElse(2) { "3" }})",
+                accentColor = EmeraldAccent
             )
             Spacer(modifier = Modifier.height(6.dp))
+
+            NumberStepper(
+                value = team2Queens,
+                onValueChange = { newVal ->
+                    val updated = draft.queensTaken.toMutableMap()
+                    updated[1] = newVal
+                    updated[3] = 0
+                    val curDoubledT2 = draft.doubledQueens.count { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
+                    val newDoubled = if (curDoubledT2 > newVal) {
+                        val t1Doubled = draft.doubledQueens.filter { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                        t1Doubled + List(newVal) { DoubledQueenInfo(doublerPlayerId = 0, takerPlayerId = 1) }
+                    } else draft.doubledQueens
+                    viewModel.updateDraftInput { it.copy(queensTaken = updated, doubledQueens = newDoubled) }
+                },
+                minValue = 0,
+                maxValue = 4,
+                label = "الفريق 2 (${playerNames.getOrElse(1) { "2" }} و ${playerNames.getOrElse(3) { "4" }})",
+                accentColor = SlateBlueLight
+            )
+        } else {
+            (0..3).forEach { pId ->
+                val count = draft.queensTaken[pId] ?: 0
+                NumberStepper(
+                    value = count,
+                    onValueChange = { newVal ->
+                        val updated = draft.queensTaken.toMutableMap()
+                        updated[pId] = newVal
+                        viewModel.updateDraftInput { it.copy(queensTaken = updated) }
+                    },
+                    minValue = 0,
+                    maxValue = 4,
+                    label = playerNames.getOrElse(pId) { "لاعب ${pId + 1}" },
+                    accentColor = CrimsonHeart
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
         }
 
         // تدبيل البنات
@@ -635,97 +862,138 @@ private fun QueensInputSection(
             HorizontalDivider(color = BorderDark)
             Spacer(modifier = Modifier.height(12.dp))
 
-            SectionHeader(
-                title = "تدبيل البنات (+25 للمدبل / -50 للآكل)",
-                subtitle = "حدد أي بنت تم تدبيلها ومن دبلها ومن أكلها"
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            if (isPartners) {
+                val team1Queens = (draft.queensTaken[0] ?: 0) + (draft.queensTaken[2] ?: 0)
+                val team2Queens = (draft.queensTaken[1] ?: 0) + (draft.queensTaken[3] ?: 0)
+                val doubledT1 = draft.doubledQueens.count { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                val doubledT2 = draft.doubledQueens.count { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
 
-            draft.doubledQueens.forEachIndexed { index, info ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(DarkBackground)
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "بنت ${index + 1}: دبّلها ${playerNames.getOrElse(info.doublerPlayerId) { "" }} وأكلها ${playerNames.getOrElse(info.takerPlayerId) { "" }}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextPrimary
-                    )
-                    IconButton(
-                        onClick = {
-                            val updated = draft.doubledQueens.toMutableList()
-                            updated.removeAt(index)
-                            viewModel.updateDraftInput { it.copy(doubledQueens = updated) }
-                        },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف", tint = CrimsonHeart)
-                    }
-                }
-            }
+                SectionHeader(
+                    title = "تدبيل البنات (+25 للفريق الآخر / -50 للآكل)",
+                    subtitle = "حدد كم بنت مدبلة أكلها كل فريق من بناته",
+                    icon = Icons.Default.Bolt
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-            if (draft.doubledQueens.size < 4) {
-                var showAddDoubledSheet by remember { mutableStateOf(false) }
-                var selectedDoubler by remember { mutableStateOf(0) }
-                var selectedTaker by remember { mutableStateOf(0) }
+                NumberStepper(
+                    value = doubledT1,
+                    onValueChange = { newVal ->
+                        val t2Doubled = draft.doubledQueens.filter { it.takerPlayerId == 1 || it.takerPlayerId == 3 }
+                        val newT1Doubled = List(newVal) { DoubledQueenInfo(doublerPlayerId = 1, takerPlayerId = 0) }
+                        viewModel.updateDraftInput { it.copy(doubledQueens = t2Doubled + newT1Doubled) }
+                    },
+                    minValue = 0,
+                    maxValue = team1Queens,
+                    label = "بنات مدبلة أكلها الفريق 1",
+                    accentColor = EmeraldAccent
+                )
+                Spacer(modifier = Modifier.height(6.dp))
 
-                OutlinedButton(
-                    onClick = { showAddDoubledSheet = !showAddDoubledSheet },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldPrimary)
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "إضافة بنت مدبلة")
-                }
+                NumberStepper(
+                    value = doubledT2,
+                    onValueChange = { newVal ->
+                        val t1Doubled = draft.doubledQueens.filter { it.takerPlayerId == 0 || it.takerPlayerId == 2 }
+                        val newT2Doubled = List(newVal) { DoubledQueenInfo(doublerPlayerId = 0, takerPlayerId = 1) }
+                        viewModel.updateDraftInput { it.copy(doubledQueens = t1Doubled + newT2Doubled) }
+                    },
+                    minValue = 0,
+                    maxValue = team2Queens,
+                    label = "بنات مدبلة أكلها الفريق 2",
+                    accentColor = SlateBlueLight
+                )
+            } else {
+                SectionHeader(
+                    title = "تدبيل البنات (+25 للمدبل / -50 للآكل)",
+                    subtitle = "حدد أي بنت تم تدبيلها ومن دبلها ومن أكلها"
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
-                if (showAddDoubledSheet) {
-                    Column(
+                draft.doubledQueens.forEachIndexed { index, info ->
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(DarkBackground)
-                            .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(text = "من قام بتدبيل البنت؟", style = MaterialTheme.typography.labelSmall, color = GoldLight)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            (0..3).forEach { pId ->
-                                FilterChip(
-                                    selected = selectedDoubler == pId,
-                                    onClick = { selectedDoubler = pId },
-                                    label = { Text(playerNames.getOrElse(pId) { "${pId + 1}" }) }
-                                )
-                            }
-                        }
-
-                        Text(text = "من أكل هذه البنت المدبلة؟", style = MaterialTheme.typography.labelSmall, color = CrimsonHeart)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            (0..3).forEach { pId ->
-                                FilterChip(
-                                    selected = selectedTaker == pId,
-                                    onClick = { selectedTaker = pId },
-                                    label = { Text(playerNames.getOrElse(pId) { "${pId + 1}" }) }
-                                )
-                            }
-                        }
-
-                        Button(
+                        Text(
+                            text = "بنت ${index + 1}: دبّلها ${playerNames.getOrElse(info.doublerPlayerId) { "" }} وأكلها ${playerNames.getOrElse(info.takerPlayerId) { "" }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextPrimary
+                        )
+                        IconButton(
                             onClick = {
-                                val updated = draft.doubledQueens + DoubledQueenInfo(selectedDoubler, selectedTaker)
+                                val updated = draft.doubledQueens.toMutableList()
+                                updated.removeAt(index)
                                 viewModel.updateDraftInput { it.copy(doubledQueens = updated) }
-                                showAddDoubledSheet = false
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = DarkBackground)
+                            modifier = Modifier.size(28.dp)
                         ) {
-                            Text("تأكيد تدبيل البنت", fontWeight = FontWeight.Bold)
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = "حذف", tint = CrimsonHeart)
+                        }
+                    }
+                }
+
+                if (draft.doubledQueens.size < 4) {
+                    var showAddDoubledSheet by remember { mutableStateOf(false) }
+                    var selectedDoubler by remember { mutableStateOf(0) }
+                    var selectedTaker by remember { mutableStateOf(0) }
+
+                    OutlinedButton(
+                        onClick = { showAddDoubledSheet = !showAddDoubledSheet },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldPrimary)
+                    ) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "إضافة بنت مدبلة")
+                    }
+
+                    if (showAddDoubledSheet) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(DarkBackground)
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(text = "من قام بتدبيل البنت؟", style = MaterialTheme.typography.labelSmall, color = GoldLight)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                (0..3).forEach { pId ->
+                                    FilterChip(
+                                        selected = selectedDoubler == pId,
+                                        onClick = { selectedDoubler = pId },
+                                        label = { Text(playerNames.getOrElse(pId) { "${pId + 1}" }) }
+                                    )
+                                }
+                            }
+
+                            Text(text = "من أكل هذه البنت المدبلة؟", style = MaterialTheme.typography.labelSmall, color = CrimsonHeart)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                (0..3).forEach { pId ->
+                                    FilterChip(
+                                        selected = selectedTaker == pId,
+                                        onClick = { selectedTaker = pId },
+                                        label = { Text(playerNames.getOrElse(pId) { "${pId + 1}" }) }
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    val updated = draft.doubledQueens + DoubledQueenInfo(selectedDoubler, selectedTaker)
+                                    viewModel.updateDraftInput { it.copy(doubledQueens = updated) }
+                                    showAddDoubledSheet = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary, contentColor = DarkBackground)
+                            ) {
+                                Text("تأكيد تدبيل البنت", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -856,7 +1124,8 @@ private fun ComplexInputSection(
     draft: RoundInput,
     viewModel: TrixViewModel,
     playerNames: List<String>,
-    doublingEnabled: Boolean
+    doublingEnabled: Boolean,
+    isPartners: Boolean = false
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // بطاقة تنبيه مجموع الكومبلكس
@@ -881,7 +1150,10 @@ private fun ComplexInputSection(
                         color = GoldLight
                     )
                     Text(
-                        text = "أدخل كروت الختيار، البنات الأربعة، الديناري (13)، واللطوش (13).",
+                        text = if (isPartners)
+                            "أدخل كروت الختيار والبنات بحسب الفريق، بالإضافة إلى الديناري (13) واللطوش (13)."
+                        else
+                            "أدخل كروت الختيار، البنات الأربعة، الديناري (13)، واللطوش (13).",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )
@@ -890,10 +1162,10 @@ private fun ComplexInputSection(
         }
 
         // 1. ختيار الكومبلكس
-        KingInputSection(draft, viewModel, playerNames, doublingEnabled)
+        KingInputSection(draft, viewModel, playerNames, doublingEnabled, isPartners)
 
         // 2. بنات الكومبلكس
-        QueensInputSection(draft, viewModel, playerNames, doublingEnabled)
+        QueensInputSection(draft, viewModel, playerNames, doublingEnabled, isPartners)
 
         // 3. ديناري الكومبلكس
         DiamondsInputSection(draft, viewModel, playerNames)
